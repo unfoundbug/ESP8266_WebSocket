@@ -27,13 +27,14 @@ edit the page by going to http://esp8266fs.local/edit
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <FS.h>
-
+#include <Arduino.h>
+#include "pins_arduino.h"
 #define DBG_OUTPUT_PORT Serial
 
-const char* ssid = "VM22843224";
-const char* password = "qtzczbwj";
+const char* ssid = "AjaxTest";
+const char* password = "AJTest";
 const char* host = "esp8266fs";
-
+#define LED_BUILTIN BUILTIN_LED
 ESP8266WebServer server(80);
 //holds the current upload
 File fsUploadFile;
@@ -176,8 +177,7 @@ void addJSONHandlers()
 		json += ", \"millis\":" + String(millis());
 		json += "}";
 		server.send(200, "text/json", json);
-		digitalWrite(LED_BUILTIN, byState);
-		byState = 1 - byState;
+		
 		json = String();
 	});
 	
@@ -209,7 +209,12 @@ void addHandlers()
 
 	addJSONHandlers();
 }
-
+void OnTimer1()
+{
+	digitalWrite(LED_BUILTIN, byState);
+	digitalWrite(D4, byState);
+	byState = 1 - byState;
+}
 void setup(void) {
 	DBG_OUTPUT_PORT.begin(115200);
 	DBG_OUTPUT_PORT.print("\n");
@@ -225,21 +230,46 @@ void setup(void) {
 		}
 		DBG_OUTPUT_PORT.printf("\n");
 	}
-
-
+	
+	/*//timer dividers
+	#define TIM_DIV1 	0 //80MHz (80 ticks/us - 104857.588 us max)
+	#define TIM_DIV16	1 //5MHz (5 ticks/us - 1677721.4 us max)
+	#define TIM_DIV265	3 //312.5Khz (1 tick = 3.2us - 26843542.4 us max)*/
+	timer1_write(388607); 
+	timer1_attachInterrupt(OnTimer1);
+	timer1_enable(TIM_DIV265, TIM_LEVEL, TIM_LOOP);
 	//WIFI INIT
-	DBG_OUTPUT_PORT.printf("Connecting to %s\n", ssid);
-	if (String(WiFi.SSID()) != String(ssid)) {
-		WiFi.begin(ssid, password);
-	}
 
-	while (WiFi.status() != WL_CONNECTED) {
+	WiFi.mode(WiFiMode_t::WIFI_OFF);
+	DBG_OUTPUT_PORT.printf("starting %s\n", ssid);
+	if (true)
+	{
+		WiFi.softAPdisconnect(true);
+		DBG_OUTPUT_PORT.printf("pre %s\n", WiFi.SSID().c_str());
+		WiFi.softAP(ssid, password);
+		DBG_OUTPUT_PORT.printf("post %s\n", WiFi.SSID().c_str());
+		WiFi.mode(WiFiMode_t::WIFI_AP);
+		DBG_OUTPUT_PORT.println("");
+		DBG_OUTPUT_PORT.print("Connected! IP address: ");
+		DBG_OUTPUT_PORT.println(WiFi.softAPIP());
+	}
+	else
+	{
+		if (String(WiFi.SSID()) != String(ssid)) {
+			WiFi.begin(ssid, password);
+			WiFi.mode(WiFiMode_t::WIFI_STA);
+		}
+
+		while (WiFi.status() != WL_CONNECTED) {
 		delay(500);
 		DBG_OUTPUT_PORT.print(".");
+		}
+
+		DBG_OUTPUT_PORT.println("");
+		DBG_OUTPUT_PORT.print("Connected! IP address: ");
+		DBG_OUTPUT_PORT.println(WiFi.localIP());
 	}
-	DBG_OUTPUT_PORT.println("");
-	DBG_OUTPUT_PORT.print("Connected! IP address: ");
-	DBG_OUTPUT_PORT.println(WiFi.localIP());
+	
 
 	MDNS.begin(host);
 	DBG_OUTPUT_PORT.print("Open http://");
