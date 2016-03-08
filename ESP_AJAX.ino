@@ -29,6 +29,10 @@ edit the page by going to http://esp8266fs.local/edit
 #include <FS.h>
 #include <Arduino.h>
 #include "pins_arduino.h"
+#include <Adafruit_NeoPixel.h>
+
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(24, 2, NEO_GRB + NEO_KHZ400);
+
 #define DBG_OUTPUT_PORT Serial
 
 const char* ssid = "AjaxTest";
@@ -165,6 +169,23 @@ void handleFileList() {
 	output += "]";
 	server.send(200, "text/json", output);
 }
+void colorWipe(uint32_t c) {
+	for (uint16_t i = 0; i<strip.numPixels(); i++) {
+		strip.setPixelColor(i, c);
+	}
+	strip.show();
+}
+void handleRGBSet()
+{
+	byte r = 0, g = 0, b = 0;
+	r = atoi( server.arg(0).c_str() );
+	g = atoi(server.arg(1).c_str());
+	b = atoi(server.arg(2).c_str());
+	DBG_OUTPUT_PORT.printf("RGB Request %s %s %s\n", server.arg(0).c_str(), server.arg(1).c_str(), server.arg(2).c_str());
+	colorWipe(strip.Color(r, g, b));
+}
+
+
 byte byState = HIGH;
 void addJSONHandlers()
 {
@@ -200,6 +221,7 @@ void addHandlers()
 	//second callback handles file uploads at that location
 	server.on("/edit", HTTP_POST, []() { server.send(200, "text/plain", ""); }, handleFileUpload);
 
+	server.on("/RGB", HTTP_GET, handleRGBSet);
 	//called when the url is not defined here
 	//use it to load content from SPIFFS
 	server.onNotFound([]() {
@@ -209,10 +231,11 @@ void addHandlers()
 
 	addJSONHandlers();
 }
+// Fill the dots one after the other with a color
+
 void OnTimer1()
 {
 	digitalWrite(LED_BUILTIN, byState);
-	digitalWrite(D4, byState);
 	byState = 1 - byState;
 }
 void setup(void) {
@@ -220,6 +243,7 @@ void setup(void) {
 	DBG_OUTPUT_PORT.print("\n");
 	DBG_OUTPUT_PORT.setDebugOutput(true);
 	pinMode(LED_BUILTIN, OUTPUT);
+	colorWipe(strip.Color(150, 0, 0));
 	SPIFFS.begin();
 	{
 		Dir dir = SPIFFS.openDir("/");
@@ -230,7 +254,7 @@ void setup(void) {
 		}
 		DBG_OUTPUT_PORT.printf("\n");
 	}
-	
+	colorWipe(strip.Color(125, 25, 0));
 	/*//timer dividers
 	#define TIM_DIV1 	0 //80MHz (80 ticks/us - 104857.588 us max)
 	#define TIM_DIV16	1 //5MHz (5 ticks/us - 1677721.4 us max)
@@ -244,22 +268,23 @@ void setup(void) {
 	DBG_OUTPUT_PORT.printf("starting %s\n", ssid);
 	if (true)
 	{
+		WiFi.mode(WiFiMode_t::WIFI_AP);
+
 		WiFi.softAPdisconnect(true);
 		DBG_OUTPUT_PORT.printf("pre %s\n", WiFi.SSID().c_str());
 		WiFi.softAP(ssid, password);
 		DBG_OUTPUT_PORT.printf("post %s\n", WiFi.SSID().c_str());
-		WiFi.mode(WiFiMode_t::WIFI_AP);
+		
 		DBG_OUTPUT_PORT.println("");
 		DBG_OUTPUT_PORT.print("Connected! IP address: ");
 		DBG_OUTPUT_PORT.println(WiFi.softAPIP());
 	}
 	else
 	{
-		if (String(WiFi.SSID()) != String(ssid)) {
-			WiFi.begin(ssid, password);
-			WiFi.mode(WiFiMode_t::WIFI_STA);
-		}
-
+		WiFi.mode(WiFiMode_t::WIFI_STA);
+		WiFi.disconnect();
+		WiFi.begin(ssid, password);
+		
 		while (WiFi.status() != WL_CONNECTED) {
 		delay(500);
 		DBG_OUTPUT_PORT.print(".");
@@ -270,17 +295,17 @@ void setup(void) {
 		DBG_OUTPUT_PORT.println(WiFi.localIP());
 	}
 	
-
+	colorWipe(strip.Color(75, 75, 0));
 	MDNS.begin(host);
 	DBG_OUTPUT_PORT.print("Open http://");
 	DBG_OUTPUT_PORT.print(host);
 	DBG_OUTPUT_PORT.println(".local/edit to see the file browser");
-
+	colorWipe(strip.Color(25, 125, 0));
 	addHandlers();
 	
 	server.begin();
 	DBG_OUTPUT_PORT.println("HTTP server started");
-
+	colorWipe(strip.Color(0,0, 0));
 }
 
 void loop(void) {

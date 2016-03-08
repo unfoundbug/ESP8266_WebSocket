@@ -25,7 +25,15 @@
     var heap,temp,digi;
     var reloadPeriod = 1000;
     var running = false;
-    
+    function hexToRgb(hex) {
+        var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : null;
+    }
+
     function loadValues(){
       if(!running) return;
       var xh = new XMLHttpRequest();
@@ -44,7 +52,14 @@
       xh.open("GET", "/all", true);
       xh.send(null);
     };
-    
+    function OnColourChange()
+    {
+      var xh2 = new XMLHttpRequest();
+      var hexcol = document.getElementById('neoColor').value;
+      document.getElementById("colout").innerHTML = "/RGB?r=" + hexToRgb(hexcol).r + "&g=" + hexToRgb(hexcol).g + "&b=" + hexToRgb(hexcol).b;
+      xh2.open("GET", document.getElementById("colout").innerHTML, true);
+      xh2.send(null);
+    };
     function run(){
       if(!running){
         running = true;
@@ -94,6 +109,8 @@
   <hr>
   <div id="millis"></div>
   <hr>
+    <input id="neoColor" type="color" value="#FF0000" onchange="javascript:OnColourChange();"><div id="colout"></div>
+    <hr />
   <div id="heap"></div>
   <div id="analog"></div>
   <div id="digital"></div>
