@@ -1,0 +1,101 @@
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		
+		<style>
+		body {
+			overflow	: hidden;
+			padding		: 0;
+			margin		: 0;
+			background-color: #BBB;
+		}
+		#info {
+			position	: absolute;
+			top		: 0px;
+			width		: 100%;
+			padding		: 5px;
+			text-align	: center;
+		}
+		#container {
+			width		: 100%;
+			height		: 100%;
+			overflow	: hidden;
+			padding		: 0;
+			margin		: 0;
+			-webkit-user-select	: none;
+			-moz-user-select	: none;
+		}
+		</style>
+	</head>
+	<body>
+		<div id="container"></div>
+		<div id="info">
+		<h1>NeoColour</h1>
+		<script>
+		function hexToRgb(hex) {
+        var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : null;
+    };
+		function OnColourChange()
+    {
+      var xh2 = new XMLHttpRequest();
+      var hexcol = document.getElementById('neoColor').value;
+      var sOutput = "/RGB?r=" + hexToRgb(hexcol).r + "&g=" + hexToRgb(hexcol).g + "&b=" + hexToRgb(hexcol).b;
+      document.getElementById("colout").innerHTML = sOutput;
+      xh2.open("GET", document.getElementById("colout").innerHTML, true);
+      xh2.send(null);
+    };
+		</script>
+		<input id="neoColor" type="color" value="#FF0000" onchange="javascript:OnColourChange();"><div id="colout">Colour Info WILL be here</div>
+		<hr/>
+			<span id="result"></span>
+		</div> 
+		
+		<script src="TouchControl.js"></script>
+		<script>
+			console.log("touchscreen is", VirtualJoystick.touchScreenAvailable() ? "available" : "not available");
+	
+			var joystick	= new VirtualJoystick({
+				container	: document.getElementById('container'),
+				limitStickTravel: true,
+				mouseSupport	: true,
+			});
+			joystick.addEventListener('touchStartValidation', function(event){
+				var touch	= event.changedTouches[0];
+				if( touch.pageY < window.innerHeight/2 )	return false;
+				return true
+			});
+			joystick.addEventListener('touchStart', function(){
+				console.log('down')
+			})
+			joystick.addEventListener('touchEnd', function(){
+				console.log('up')
+			})
+
+			setInterval(function(){
+				var outputEl	= document.getElementById('result');
+				var dirX = Math.floor(( joystick.deltaX() *1.27) +127);
+				var dirY = -1 * Math.floor(( joystick.deltaY() *1.27));
+				
+				var motL = Math.min(Math.max((dirX - 127) + dirY + 127, 0), 255);
+				var motR = Math.min(Math.max((127 - dirX) + dirY + 127, 0), 255);
+				
+				
+				outputEl.innerHTML	= '<b>Result:</b> '
+					+ ' dx:'+ Math.floor(dirX)
+					+ ' dy:'+ Math.floor(dirY)
+					+ ' motL:'+ motL
+					+ ' motR:'+ motR
+					+ (joystick.right()	? ' right'	: '')
+					+ (joystick.up()	? ' up'		: '')
+					+ (joystick.left()	? ' left'	: '')
+					+ (joystick.down()	? ' down' 	: '')	
+			}, 1/30 * 1000);
+		</script>
+	</body>
+</html>
