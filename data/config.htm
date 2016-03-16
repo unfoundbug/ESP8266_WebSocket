@@ -1,0 +1,125 @@
+﻿<!-- 
+  FSWebServer - Example Index Page
+  Copyright (c) 2015 Hristo Gochkov. All rights reserved.
+  This file is part of the ESP8266WebServer library for Arduino environment.
+ 
+  This library is free software; you can redistribute it and/or
+  modify it under the terms of the GNU Lesser General Public
+  License as published by the Free Software Foundation; either
+  version 2.1 of the License, or (at your option) any later version.
+  This library is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  Lesser General Public License for more details.
+  You should have received a copy of the GNU Lesser General Public
+  License along with this library; if not, write to the Free Software
+  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+-->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+  <title>ESP Monitor</title>
+
+  <script type="text/javascript">
+    
+    function loadValues(){
+      if(!running) return;
+      var xh = new XMLHttpRequest();
+      xh.onreadystatechange = function(){
+        if (xh.readyState == 4){
+          if(xh.status == 200) {
+            var res = JSON.parse(xh.responseText);
+            heap.add(res.heap);
+            temp.add(res.analog);
+            digi.add(res.gpio);
+            document.getElementById("millis").innerHTML = "millis: " + res.millis;
+            if(running) setTimeout(loadValues, reloadPeriod);
+          } else running = false;
+        }
+      };
+      xh.open("GET", "/all", true);
+      xh.send(null);
+    };
+    function onBodyLoad() {
+        onSTAChange();
+        onAPChange();
+    }
+    function onSTAChange() {
+        var enabled = document.getElementById("cbSTAEnable").checked;
+        if (enabled == true) {
+            document.getElementById("txtSTASSID").disabled = "";
+            document.getElementById("txtSTAPass").disabled = "";
+            document.getElementById("txtSTASSID").value = "";
+            document.getElementById("txtSTAPass").value = "";
+        } else {
+            document.getElementById("txtSTASSID").disabled = "disabled";
+            document.getElementById("txtSTAPass").disabled = "disabled";
+            document.getElementById("txtSTASSID").value = "disabled";
+            document.getElementById("txtSTAPass").value = "disabled";
+        }
+        
+    }
+    function onAPChange()
+    {
+        var enabled = document.getElementById("cbAPEnable").checked;
+        if (enabled == true) {
+            document.getElementById("txtAPSSID").disabled = "";
+            document.getElementById("txtAPPass").disabled = "";
+            document.getElementById("txtAPSSID").value = "";
+            document.getElementById("txtAPPass").value = "";
+        } else {
+            document.getElementById("txtAPSSID").disabled = "disabled";
+            document.getElementById("txtAPPass").disabled = "disabled";
+            document.getElementById("txtAPSSID").value = "disabled";
+            document.getElementById("txtAPPass").value = "disabled";
+        }
+    }
+    function Submit() {
+        var output = "/setWifi?mode=";
+        if (document.getElementById("cbAPEnable").checked == true
+            &&
+            document.getElementById("cbSTAEnable").checked == true)
+        {
+            output = output + "both";
+        } else if (document.getElementById("cbAPEnable").checked == true) {
+            output = output + "AP";
+        } else if (document.getElementById("cbSTAEnable").checked == true) {
+            output = output + "STA";
+        }else{
+            output = output + "none";
+        }
+
+        if (document.getElementById("cbSTAEnable").checked == true)
+        {
+            output = output + "&stassid=" + document.getElementById("txtSTASSID").value;
+            output = output + "&stapass=" + document.getElementById("txtSTAPass").value;
+        }
+        if (document.getElementById("cbAPEnable").checked == true) {
+            output = output + "&apsid=" + document.getElementById("txtAPSSID").value;
+            output = output + "&appass=" + document.getElementById("txtAPPass").value;
+        }
+        document.getElementById("result").innerHTML = output;
+    }
+  </script>
+</head>
+<body id="index" style="margin:0; padding:0;" onload="onBodyLoad()">
+  <div id="controls" style="display: block; border: 1px solid rgb(68, 68, 68); padding: 5px; margin: 5px; width: 362px; background-color: rgb(238, 238, 238);">
+      <form>
+          Station mode:<input type="checkbox" onchange="onSTAChange()" id="cbSTAEnable"/>
+          <br />
+          SSID:<input type="text" id="txtSTASSID"/><br />
+          Pass:<input type="password" id="txtSTAPass"/>
+          <br /><br />
+          Access Point mode: <input type="checkbox" onchange="onAPChange()" id="cbAPEnable"/>
+          <br />
+          SSID:<input type="text" id="txtAPSSID" /><br />
+          Pass:<input type="password" id="txtAPPass" />
+          <br /><br />
+          <button onclick="Submit()" type="button">Save Wifi</button>
+      </form>
+  </div>
+  <hr>
+    <div id="result"></div>
+</body>
+</html>
