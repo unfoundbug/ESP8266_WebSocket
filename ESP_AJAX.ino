@@ -28,10 +28,9 @@ edit the page by going to http://esp8266fs.local/edit
 #include <ESP8266mDNS.h>
 #include <FS.h>
 #include <Arduino.h>
-#include "pins_arduino.h"
 #include <Adafruit_NeoPixel.h>
 
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(24, 2, NEO_GRB + NEO_KHZ400);
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(24, 14, NEO_GRB + NEO_KHZ400);
 
 #define DBG_OUTPUT_PORT Serial
 
@@ -204,6 +203,36 @@ void addJSONHandlers()
 	
 }
 
+void handleMotorSet()
+{/*
+	byte motL = 127, motR = 127;
+	int iFindIter = 0;
+	for (iFindIter = 0; iFindIter < server.args(); ++iFindIter)
+	{
+		String strArgName = server.argName(iFindIter);
+		if (strArgName.c_str()[0] == 'm'
+			&&
+			strArgName.c_str()[1] == 'o'
+			&&
+			strArgName.c_str()[2] == 't'
+			)
+		{
+			if (strArgName.c_str()[3] == 'L')
+				motL = atoi(server.arg(iFindIter).c_str());
+			if (strArgName.c_str()[3] == 'R')
+				motR = atoi(server.arg(iFindIter).c_str());
+		}
+	}
+	SDalekMotorPacket sPacket;
+	sPacket.byPacketID = 0;
+	sPacket.byDeviceID = 0;
+	sPacket.byPacketDataX = 0;
+	sPacket.byPacketDataY = 0;
+	sPacket.byPacketDataZ = 0;
+	AddCRC(&sPacket);
+	Serial1.write((uint8_t*)&sPacket, 9);
+	DBG_OUTPUT_PORT.printf("Mot request handled %02X %02X\n", motL, motR);*/
+}
 void addHandlers()
 {
 	//SERVER INIT
@@ -268,12 +297,14 @@ void setup(void) {
 	DBG_OUTPUT_PORT.printf("starting %s\n", ssid);
 	if (true)
 	{
-		WiFi.mode(WiFiMode_t::WIFI_AP);
-
 		WiFi.softAPdisconnect(true);
+		
 		DBG_OUTPUT_PORT.printf("pre %s\n", WiFi.SSID().c_str());
 		WiFi.softAP(ssid, password);
 		DBG_OUTPUT_PORT.printf("post %s\n", WiFi.SSID().c_str());
+		WiFi.enableSTA(false);
+		WiFi.enableAP(true);
+		WiFi.mode(WiFiMode_t::WIFI_AP);
 		
 		DBG_OUTPUT_PORT.println("");
 		DBG_OUTPUT_PORT.print("Connected! IP address: ");
@@ -281,10 +312,12 @@ void setup(void) {
 	}
 	else
 	{
-		WiFi.mode(WiFiMode_t::WIFI_STA);
+		
 		WiFi.disconnect();
 		WiFi.begin(ssid, password);
-		
+		WiFi.enableSTA(true);
+		WiFi.enableAP(false);
+		WiFi.mode(WiFiMode_t::WIFI_STA);
 		while (WiFi.status() != WL_CONNECTED) {
 		delay(500);
 		DBG_OUTPUT_PORT.print(".");
