@@ -42,6 +42,22 @@ ESP8266WebServer server(80);
 //holds the current upload
 File fsUploadFile;
 
+enum eWifiSetting
+{
+	eWifi_Off,
+	eWifi_STA,
+	eWifi_AP,
+	eWifi_Both
+};
+struct sWiFiSettings
+{
+	eWifiSetting eCurrentMode;
+	char rgcSTASSID[33];
+	char rgcSTAPass[33];
+	char rgcAPSSID[33];
+	char rgcAPPass[33];
+};
+
 //format bytes
 String formatBytes(size_t bytes) {
 	if (bytes < 1024) {
@@ -283,6 +299,7 @@ void setup(void) {
 		}
 		DBG_OUTPUT_PORT.printf("\n");
 	}
+	
 	colorWipe(strip.Color(125, 25, 0));
 	/*//timer dividers
 	#define TIM_DIV1 	0 //80MHz (80 ticks/us - 104857.588 us max)
@@ -293,41 +310,61 @@ void setup(void) {
 	timer1_enable(TIM_DIV265, TIM_LEVEL, TIM_LOOP);
 	//WIFI INIT
 
-	WiFi.mode(WiFiMode_t::WIFI_OFF);
-	DBG_OUTPUT_PORT.printf("starting %s\n", ssid);
-	if (true)
+	WiFi.mode(WIFI_OFF);
+	DBG_OUTPUT_PORT.println("Attempting to load wifi settings");
+	fs::File wifiFile = SPIFFS.open("wifiSettings.txt", "r");
+	sWiFiSettings sSettingsContainer;
+	if (wifiFile.size())
 	{
-		WiFi.softAPdisconnect(true);
-		
-		DBG_OUTPUT_PORT.printf("pre %s\n", WiFi.SSID().c_str());
-		WiFi.softAP(ssid, password);
-		DBG_OUTPUT_PORT.printf("post %s\n", WiFi.SSID().c_str());
-		WiFi.enableSTA(false);
-		WiFi.enableAP(true);
-		WiFi.mode(WiFiMode_t::WIFI_AP);
-		
-		DBG_OUTPUT_PORT.println("");
-		DBG_OUTPUT_PORT.print("Connected! IP address: ");
-		DBG_OUTPUT_PORT.println(WiFi.softAPIP());
+		DBG_OUTPUT_PORT.println("Settings loaded");
+		wifiFile.readBytes((char*)&sSettingsContainer, sizeof(sSettingsContainer));
 	}
 	else
 	{
 		
-		WiFi.disconnect();
-		WiFi.begin(ssid, password);
-		WiFi.enableSTA(true);
-		WiFi.enableAP(false);
-		WiFi.mode(WiFiMode_t::WIFI_STA);
-		while (WiFi.status() != WL_CONNECTED) {
-		delay(500);
-		DBG_OUTPUT_PORT.print(".");
-		}
-
-		DBG_OUTPUT_PORT.println("");
-		DBG_OUTPUT_PORT.print("Connected! IP address: ");
-		DBG_OUTPUT_PORT.println(WiFi.localIP());
+		sSettingsContainer.eCurrentMode = eWifi_AP;
+		sSettingsContainer.rgcSTASSID[0] = 0;
+		sSettingsContainer.rgcSTAPass[0] = 0;
+		sprintf(sSettingsContainer.rgcAPSSID, "esp8266_%d", ESP.getChipId());
+		sSettingsContainer.rgcAPPass[0] = 0;
+		DBG_OUTPUT_PORT.printf("Loading default settings, connect to %s\n\r", sSettingsContainer.rgcAPSSID);
+		wifiFile = SPIFFS.open("wifiSettings.txt", "w");
+		wifiFile.write((uint8_t*)&sSettingsContainer, sizeof(sSettingsContainer));
 	}
-	
+	switch (sSettingsContainer.eCurrentMode)
+	{
+		case eWifi_AP: {
+			//WiFi.enableSTA(false);
+			//WiFi.enableAP(true);
+
+			WiFi.softAPdisconnect(true);
+			WiFi.softAP(ssid, password);
+
+			WiFi.mode(WIFI_AP);
+
+		}break;
+		case eWifi_STA: {
+			//WiFi.enableSTA(true);
+			//WiFi.enableAP(false);
+
+			WiFi.disconnect();
+			WiFi.begin(ssid, password);
+			WiFi.mode(WIFI_STA);
+
+		}break;
+		case eWifi_Both: {
+			//WiFi.enableSTA(true);
+			//WiFi.enableAP(true);
+
+			WiFi.softAPdisconnect(true);
+			WiFi.softAP(ssid, password);
+
+			WiFi.disconnect();
+			WiFi.begin(ssid, password);
+			WiFi.mode(WIFI_AP_STA);
+
+		}break;
+	}
 	colorWipe(strip.Color(75, 75, 0));
 	MDNS.begin(host);
 	DBG_OUTPUT_PORT.print("Open http://");
