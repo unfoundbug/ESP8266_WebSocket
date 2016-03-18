@@ -57,7 +57,7 @@ struct sWiFiSettings
 	char rgcAPSSID[33];
 	char rgcAPPass[33];
 };
-
+sWiFiSettings sSettingsContainer;
 //format bytes
 String formatBytes(size_t bytes) {
 	if (bytes < 1024) {
@@ -199,7 +199,46 @@ void handleRGBSet()
 	DBG_OUTPUT_PORT.printf("RGB Request %s %s %s\n", server.arg(0).c_str(), server.arg(1).c_str(), server.arg(2).c_str());
 	colorWipe(strip.Color(r, g, b));
 }
-
+void handleWifiSettings()
+{
+	DBG_OUTPUT_PORT.printf("Handing wifi settings\n");
+	for (int i = 0; i < server.args(); ++i)
+	{
+		String strArgName = server.argName(i);
+		String strArg = server.arg(i);
+		DBG_OUTPUT_PORT.printf("Checking arg: %s of value: %s\n", strArgName.c_str(), strArg.c_str());
+		int ToCopy = strArg.length();
+		if (ToCopy > 32)
+			ToCopy = 32;
+		switch (strArgName.charAt(0))
+		{
+			case 'c':
+			{
+				DBG_OUTPUT_PORT.println("Wifi mode deteted");
+				if (ToCopy == 1)
+					sSettingsContainer.eCurrentMode = (eWifiSetting)(strArg.charAt(0) - '0');
+			}break;
+			case 's':
+			{
+				DBG_OUTPUT_PORT.println("Sta setting found");
+				if (strArgName.charAt(1) == 's')
+					memcpy(sSettingsContainer.rgcSTASSID, strArg.c_str(), ToCopy);
+				if (strArgName.charAt(1) == 'p')
+					memcpy(sSettingsContainer.rgcSTAPass, strArg.c_str(), ToCopy);
+			}break;
+			case 'a':
+			{
+				DBG_OUTPUT_PORT.println("AP Setting found");
+				if (strArgName.charAt(1) == 's')
+					memcpy(sSettingsContainer.rgcAPSSID, strArg.c_str(), ToCopy);
+				if (strArgName.charAt(1) == 'p')
+					memcpy(sSettingsContainer.rgcAPPass, strArg.c_str(), ToCopy);
+			}break;
+			
+		}
+	}
+	server.send(200, "text/plain", "");
+}
 
 byte byState = HIGH;
 void addJSONHandlers()
@@ -210,8 +249,12 @@ void addJSONHandlers()
 		json += "\"heap\":" + String(ESP.getFreeHeap());
 		json += ", \"analog\":" + String(analogRead(A0));
 		json += ", \"gpio\":" + String((uint32_t)(((GPI | GPO) & 0xFFFF) | ((GP16I & 0x01) << 16)));
-		json += ", \"millis\":" + String(millis());
-		json += "}";
+		json += ", \"WifiC\": " + String(sSettingsContainer.eCurrentMode);
+		json += ", \"WifiSS\": \"" + String(sSettingsContainer.rgcSTASSID);
+		json += "\", \"WifiSP\": \"" + String(sSettingsContainer.rgcSTAPass);
+		json += "\", \"WifiAS\": \"" + String(sSettingsContainer.rgcAPSSID);
+		json += "\", \"WifiAP\": \"" + String(sSettingsContainer.rgcAPPass);
+		json += "\"}";
 		server.send(200, "text/json", json);
 		
 		json = String();
@@ -267,7 +310,9 @@ void addHandlers()
 	server.on("/edit", HTTP_POST, []() { server.send(200, "text/plain", ""); }, handleFileUpload);
 
 	server.on("/RGB", HTTP_GET, handleRGBSet);
-	//called when the url is not defined here
+
+	server.on("/wifi", HTTP_GET, handleWifiSettings);
+		//called when the url is not defined here
 	//use it to load content from SPIFFS
 	server.onNotFound([]() {
 		if (!handleFileRead(server.uri()))
@@ -311,9 +356,10 @@ void setup(void) {
 	//WIFI INIT
 
 	WiFi.mode(WIFI_OFF);
+	WiFi.disconnect(true);
 	DBG_OUTPUT_PORT.println("Attempting to load wifi settings");
 	fs::File wifiFile = SPIFFS.open("wifiSettings.txt", "r");
-	sWiFiSettings sSettingsContainer;
+	
 	if (wifiFile.size())
 	{
 		DBG_OUTPUT_PORT.println("Settings loaded");
@@ -338,30 +384,28 @@ void setup(void) {
 			//WiFi.enableAP(true);
 
 			WiFi.softAPdisconnect(true);
-			WiFi.softAP(ssid, password);
-
 			WiFi.mode(WIFI_AP);
-
+			WiFi.softAP(sSettingsContainer.rgcAPSSID, sSettingsContainer.rgcAPPass);
 		}break;
 		case eWifi_STA: {
 			//WiFi.enableSTA(true);
 			//WiFi.enableAP(false);
-
 			WiFi.disconnect();
-			WiFi.begin(ssid, password);
 			WiFi.mode(WIFI_STA);
-
+			WiFi.begin("broken", "broken");
+			WiFi.begin(sSettingsContainer.rgcSTASSID, sSettingsContainer.rgcSTAPass);
 		}break;
 		case eWifi_Both: {
 			//WiFi.enableSTA(true);
 			//WiFi.enableAP(true);
-
+			WiFi.mode(WIFI_AP_STA);
 			WiFi.softAPdisconnect(true);
-			WiFi.softAP(ssid, password);
+			WiFi.softAP(sSettingsContainer.rgcAPSSID, sSettingsContainer.rgcAPPass);
 
 			WiFi.disconnect();
-			WiFi.begin(ssid, password);
-			WiFi.mode(WIFI_AP_STA);
+			WiFi.begin("broken", "broken");
+			WiFi.begin(sSettingsContainer.rgcSTASSID, sSettingsContainer.rgcSTAPass);
+			
 
 		}break;
 	}
