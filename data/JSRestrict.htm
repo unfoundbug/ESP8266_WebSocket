@@ -66,8 +66,6 @@
 				mouseSupport	: true,
 			});
 			joystick.addEventListener('touchStartValidation', function(event){
-				var touch	= event.changedTouches[0];
-				if( touch.pageY < window.innerHeight/2 )	return false;
 				return true
 			});
 			joystick.addEventListener('touchStart', function(){
@@ -87,13 +85,26 @@
 			function onTimerTrigger()
 			{
 				var outputEl	= document.getElementById('result');
-				var dirX = Math.floor(( joystick.deltaX() *1.27) +127);
-				var dirY = -1 * Math.floor(( joystick.deltaY() *1.27));
 				
-				var motL = Math.min(Math.max((dirX - 127) + dirY + 127, 0), 255);
-				var motR = Math.min(Math.max((127 - dirX) + dirY + 127, 0), 255);
+				var dirX = Math.floor(( joystick.deltaX() *1.27));
+				var dirY = Math.floor(( joystick.deltaY() *1.27));
 				
-				
+				var motL = 127;
+				var motR = 127;
+				if(joystick.up() || joystick.down())
+				{
+				    motL = motR = 127 - dirY;
+				}
+				if(joystick.left())
+				{
+				    motL = 127 + dirX;
+				    motR = 127;
+				}
+				if(joystick.right())
+				{
+				    motL = 127;
+				    motR = 127 - dirX;
+				}
 				outputEl.innerHTML	= '<b>Result:</b> '
 					+ ' dx:'+ Math.floor(dirX)
 					+ ' dy:'+ Math.floor(dirY)
