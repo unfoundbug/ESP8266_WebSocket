@@ -29,18 +29,20 @@ edit the page by going to http://esp8266fs.local/edit
 #include <FS.h>
 #include <Arduino.h>
 #include <Adafruit_NeoPixel.h>
-
+#include "Packets.h"
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(24, 14, NEO_GRB + NEO_KHZ400);
-
+SDalekMotorPacket packetStorage;
 #define DBG_OUTPUT_PORT Serial
 
 const char* ssid = "AjaxTest";
 const char* password = "AJTest";
 const char* host = "esp8266fs";
-#define LED_BUILTIN BUILTIN_LED
 ESP8266WebServer server(80);
 //holds the current upload
 File fsUploadFile;
+
+WiFiUDP broadcastListener;
+
 
 enum eWifiSetting
 {
@@ -237,7 +239,12 @@ void handleWifiSettings()
 			
 		}
 	}
-	server.send(200, "text/plain", "");
+	fs::File wifiFile = SPIFFS.open("/wifiSettings.txt", "w");
+	wifiFile.write((uint8_t*)&sSettingsContainer, sizeof(sSettingsContainer));
+	wifiFile.flush();
+	wifiFile.close();
+	server.send(200, "text/plain", "Restarting now!");
+	ESP.restart();
 }
 
 byte byState = HIGH;
@@ -325,14 +332,14 @@ void addHandlers()
 
 void OnTimer1()
 {
-	digitalWrite(LED_BUILTIN, byState);
 	byState = 1 - byState;
 }
+
 void setup(void) {
 	DBG_OUTPUT_PORT.begin(115200);
 	DBG_OUTPUT_PORT.print("\n");
 	DBG_OUTPUT_PORT.setDebugOutput(true);
-	pinMode(LED_BUILTIN, OUTPUT);
+	Serial1.begin(115200);
 	colorWipe(strip.Color(150, 0, 0));
 	SPIFFS.begin();
 	{
@@ -358,12 +365,12 @@ void setup(void) {
 	WiFi.mode(WIFI_OFF);
 	WiFi.disconnect(true);
 	DBG_OUTPUT_PORT.println("Attempting to load wifi settings");
-	fs::File wifiFile = SPIFFS.open("wifiSettings.txt", "r");
+	fs::File wifiFile = SPIFFS.open("/wifiSettings.txt", "r");
 	
-	if (wifiFile.size())
+	if (wifiFile)
 	{
-		DBG_OUTPUT_PORT.println("Settings loaded");
-		wifiFile.readBytes((char*)&sSettingsContainer, sizeof(sSettingsContainer));
+		int res = wifiFile.read((uint8_t*)&sSettingsContainer, sizeof(sSettingsContainer));
+		DBG_OUTPUT_PORT.printf("Settings loaded %d bytes read", res);
 	}
 	else
 	{
@@ -374,15 +381,17 @@ void setup(void) {
 		sprintf(sSettingsContainer.rgcAPSSID, "esp8266_%d", ESP.getChipId());
 		sSettingsContainer.rgcAPPass[0] = 0;
 		DBG_OUTPUT_PORT.printf("Loading default settings, connect to %s\n\r", sSettingsContainer.rgcAPSSID);
-		wifiFile = SPIFFS.open("wifiSettings.txt", "w");
-		wifiFile.write((uint8_t*)&sSettingsContainer, sizeof(sSettingsContainer));
+		wifiFile = SPIFFS.open("/wifiSettings.txt", "w");
+		wifiFile.write((uint8_t*)&sSettingsContainer, sizeof(sWiFiSettings));
+		wifiFile.flush();
+		wifiFile.close();
 	}
 	switch (sSettingsContainer.eCurrentMode)
 	{
 		case eWifi_AP: {
 			//WiFi.enableSTA(false);
 			//WiFi.enableAP(true);
-
+			DBG_OUTPUT_PORT.printf("AP %s %s\n\r", sSettingsContainer.rgcAPSSID, sSettingsContainer.rgcAPPass);
 			WiFi.softAPdisconnect(true);
 			WiFi.mode(WIFI_AP);
 			WiFi.softAP(sSettingsContainer.rgcAPSSID, sSettingsContainer.rgcAPPass);
@@ -390,6 +399,7 @@ void setup(void) {
 		case eWifi_STA: {
 			//WiFi.enableSTA(true);
 			//WiFi.enableAP(false);
+			DBG_OUTPUT_PORT.printf("STA %s %s\n\r", sSettingsContainer.rgcSTASSID, sSettingsContainer.rgcSTAPass);
 			WiFi.disconnect();
 			WiFi.mode(WIFI_STA);
 			WiFi.begin("broken", "broken");
@@ -398,6 +408,8 @@ void setup(void) {
 		case eWifi_Both: {
 			//WiFi.enableSTA(true);
 			//WiFi.enableAP(true);
+			DBG_OUTPUT_PORT.printf("AP %s %s\n\r", sSettingsContainer.rgcAPSSID, sSettingsContainer.rgcAPPass);
+			DBG_OUTPUT_PORT.printf("STA %s %s\n\r", sSettingsContainer.rgcSTASSID, sSettingsContainer.rgcSTAPass);
 			WiFi.mode(WIFI_AP_STA);
 			WiFi.softAPdisconnect(true);
 			WiFi.softAP(sSettingsContainer.rgcAPSSID, sSettingsContainer.rgcAPPass);
@@ -406,8 +418,13 @@ void setup(void) {
 			WiFi.begin("broken", "broken");
 			WiFi.begin(sSettingsContainer.rgcSTASSID, sSettingsContainer.rgcSTAPass);
 			
-
 		}break;
+		default:
+		{
+			DBG_OUTPUT_PORT.printf("Things went wrong ID: %d\n\r", sSettingsContainer.eCurrentMode);
+			DBG_OUTPUT_PORT.printf("AP %s %s\n\r", sSettingsContainer.rgcAPSSID, sSettingsContainer.rgcAPPass);
+			DBG_OUTPUT_PORT.printf("STA %s %s\n\r", sSettingsContainer.rgcSTASSID, sSettingsContainer.rgcSTAPass);
+		}
 	}
 	colorWipe(strip.Color(75, 75, 0));
 	MDNS.begin(host);
@@ -420,8 +437,50 @@ void setup(void) {
 	server.begin();
 	DBG_OUTPUT_PORT.println("HTTP server started");
 	colorWipe(strip.Color(0,0, 0));
+	
+	broadcastListener.begin(8080);
+	DBG_OUTPUT_PORT.println("UDP Server listening");
+
 }
 
 void loop(void) {
 	server.handleClient();
+	if (broadcastListener.parsePacket())
+	{
+		char string[60];
+		char UDPBuf[20];
+		broadcastListener.read(UDPBuf, 20);
+
+		sprintf(string, "Read Data: 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%02X 0x%04X\n",
+			packetStorage.byPacketSize = UDPBuf[0],
+			packetStorage.byPacketVersion = UDPBuf[1],
+			packetStorage.byPacketID = UDPBuf[2],
+			packetStorage.byDeviceID = UDPBuf[3],
+			packetStorage.byPacketDataX = UDPBuf[4],
+			packetStorage.byPacketDataY = UDPBuf[5],
+			packetStorage.byPacketDataZ = UDPBuf[6],
+			packetStorage.i16PacketRC = ((uint16)UDPBuf[8]) << 8 | UDPBuf[7]);
+		Serial.write(string);
+
+		sprintf(string, "\nCRC in packet: 0x%04X\n", packetStorage.i16PacketRC);
+		Serial.write(string);
+		uint16_t i16CurrentCRC = packetStorage.i16PacketRC;
+		AddCRC(&packetStorage);
+
+		sprintf(string, "CRC Calculated: 0x%04X\n", i16CurrentCRC, packetStorage.i16PacketRC);
+		Serial.write(string);
+
+		if (packetStorage.i16PacketRC != i16CurrentCRC)
+		{
+			Serial.print("Packet failed checksum!\n\r");
+			//Dump all the things
+			while (broadcastListener.available())
+				broadcastListener.read();
+		}
+		else
+		{
+			Serial.print("Packet passed checksum!\n\r");
+			Serial1.write((char*)UDPBuf, sizeof(SDalekMotorPacket));
+		}
+	}
 }
