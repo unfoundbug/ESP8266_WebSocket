@@ -270,7 +270,7 @@ void addJSONHandlers()
 }
 
 void handleMotorSet()
-{/*
+{
 	byte motL = 127, motR = 127;
 	int iFindIter = 0;
 	for (iFindIter = 0; iFindIter < server.args(); ++iFindIter)
@@ -292,12 +292,14 @@ void handleMotorSet()
 	SDalekMotorPacket sPacket;
 	sPacket.byPacketID = 0;
 	sPacket.byDeviceID = 0;
-	sPacket.byPacketDataX = 0;
-	sPacket.byPacketDataY = 0;
+	sPacket.byPacketDataX = motL;
+	sPacket.byPacketDataY = motR;
 	sPacket.byPacketDataZ = 0;
 	AddCRC(&sPacket);
 	Serial1.write((uint8_t*)&sPacket, 9);
-	DBG_OUTPUT_PORT.printf("Mot request handled %02X %02X\n", motL, motR);*/
+	DBG_OUTPUT_PORT.printf("Mot request handled %02X %02X\n", motL, motR);
+
+	server.send(200, "text/plain", "Done");
 }
 void addHandlers()
 {
@@ -319,6 +321,8 @@ void addHandlers()
 	server.on("/RGB", HTTP_GET, handleRGBSet);
 
 	server.on("/wifi", HTTP_GET, handleWifiSettings);
+
+	server.on("/mot", HTTP_GET, handleMotorSet);
 		//called when the url is not defined here
 	//use it to load content from SPIFFS
 	server.onNotFound([]() {

@@ -11,7 +11,7 @@ struct SDalekMotorPacket
 	uint8_t byDeviceID;
 	uint8_t byPacketDataX, byPacketDataY, byPacketDataZ;
 	uint16_t i16PacketRC = 0;
-};
+}__attribute__((packed));
 
 /* CRC16 Definitions */
 static const unsigned short crc_table[256] = {

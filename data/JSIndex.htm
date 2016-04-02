@@ -40,16 +40,16 @@
             g: parseInt(result[2], 16),
             b: parseInt(result[3], 16)
         } : null;
-    };
+		};
 		function OnColourChange()
-    {
-      var xh2 = new XMLHttpRequest();
-      var hexcol = document.getElementById('neoColor').value;
-      var sOutput = "/RGB?r=" + hexToRgb(hexcol).r + "&g=" + hexToRgb(hexcol).g + "&b=" + hexToRgb(hexcol).b;
-      document.getElementById("colout").innerHTML = sOutput;
-      xh2.open("GET", document.getElementById("colout").innerHTML, true);
-      xh2.send(null);
-    };
+		{
+			var xh2 = new XMLHttpRequest();
+			var hexcol = document.getElementById('neoColor').value;
+			var sOutput = "/RGB?r=" + hexToRgb(hexcol).r + "&g=" + hexToRgb(hexcol).g + "&b=" + hexToRgb(hexcol).b;
+			document.getElementById("colout").innerHTML = sOutput;
+			xh2.open("GET", document.getElementById("colout").innerHTML, true);
+			xh2.send(null);
+		};
 		</script>
 		<input id="neoColor" type="color" value="#FF0000" onchange="javascript:OnColourChange();"><div id="colout">Colour Info WILL be here</div>
 		<hr/>
@@ -76,8 +76,16 @@
 			joystick.addEventListener('touchEnd', function(){
 				console.log('up')
 			})
-
-			setInterval(function(){
+				
+			function sendNewMotor(motL, motR)
+			{
+				var xh2 = new XMLHttpRequest();
+				var sOutput = "/mot?motL=" + motL + "&motR=" + motR;
+				xh2.open("GET", sOutput, true);
+				xh2.send(null);
+			}
+			function onTimerTrigger()
+			{
 				var outputEl	= document.getElementById('result');
 				var dirX = Math.floor(( joystick.deltaX() *1.27) +127);
 				var dirY = -1 * Math.floor(( joystick.deltaY() *1.27));
@@ -94,8 +102,11 @@
 					+ (joystick.right()	? ' right'	: '')
 					+ (joystick.up()	? ' up'		: '')
 					+ (joystick.left()	? ' left'	: '')
-					+ (joystick.down()	? ' down' 	: '')	
-			}, 1/30 * 1000);
+					+ (joystick.down()	? ' down' 	: '')
+				sendNewMotor(motL, motR);
+				
+			};
+			setInterval(onTimerTrigger, 250);
 		</script>
 	</body>
 </html>
